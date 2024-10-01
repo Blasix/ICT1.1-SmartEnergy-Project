@@ -1,0 +1,82 @@
+﻿@page "/measurements"
+@attribute [StreamRendering]
+@inject IMeasurementRepository measurementRepository;
+
+<PageTitle>Measurements</PageTitle>
+
+<h1>Measurements</h1>
+
+<p>Dit component toont hoe data getoond kan worden. De data die wordt getoond is van een voorgeprogrammeerde Smart Meter in combinatie met data van het lectoraat Smart Energy (energieprijzen, temperaturen). Pas de code aan om de data van jouw meter te tonen </p>
+
+@if (measurements == null)
+{
+    <p><em>Data wordt geladen...</em></p>
+}
+else
+{
+    <!--
+        When the measurements variable has values in it we will draw a table with a header (thead) and
+        add the data to the table (tbody). We use the foreach to loop over te list of measurements and
+        a single line <tr> is added for each of the indivudial measurement objects. Colums are seperated
+        using <th> for the header or <td> for the body as you can see in the code below.
+    -->
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Timestamp (UTC)</th>
+                <th>Location ID</th>
+                <th>Sensor</th>
+                <th>Value</th>
+                <th>Unit</th>
+                <th>Price (energy only)</th>
+                <th>Temperature</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var measurement in measurements)
+            {
+                <tr>
+                    <td>@measurement.Timestamp</td>
+                    <td>@measurement.LocationId</td>
+                    <td>@measurement.Sensor</td>
+                    <td>@measurement.Value</td>
+                    <td>@measurement.Unit</td>
+                    <td>@measurement.EnergyPrice</td>
+                    <td>@measurement.Temperature</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    /* This is where all the magic happens. During the page load the OnInitializedAsync method is
+    executed and the measurementRepository is used to retrieve the data from the Influx Database.
+    Feel free to adapt the code and tweak this to your needs. */
+
+    private List<Measurement>? measurements;
+
+    protected override async Task OnInitializedAsync()
+    {
+        /* TODO: update the value to the ID of your meter. Please note that this meterId is a decimal number and your
+        P1 meter is a Hexadecimal number. Thus you need to convert the ID from HEX to Decimal and put the number here. */
+        int meterId = 1078608;
+
+        /* TODO: Number of days to retrieve, ajust according to your needs/requirements. */
+        int numberOfDays = 3;
+
+        /* TODO: The time window to summarize the data. Examples are 20s (20 seconds), 5m (5 minutes) or 1h (1 hour). The
+        smaller the value you set the more records and details you will retrieve from the meter. But it will also take
+        longer to render your razor page. So choose the value wisely! Note: Anything smaller than 20 seconds has no
+        effect, since the P1 meter only collects the data every 20 seconds. */
+        string aggegationWindow = "5m";
+
+        /* TODO: there are multiple data streams available. Two for the value of the power meter (consumed, produced)
+        one for the gas consumption and another one for the absolute power usage. All of the possible method calls
+        are listed below and you can select the one that meets your needs/requirements. */
+        measurements = await this.measurementRepository.GetEnergyConsumed(meterId, numberOfDays, aggegationWindow);
+        // measurements = await this.measurementRepository.GetEnergyProduced(meterId, numberOfDays, aggegationWindow);
+        // measurements = await this.measurementRepository.GetGasDelivered(meterId, numberOfDays, aggegationWindow);
+        // measurements = await this.measurementRepository.GetPower(meterId, numberOfDays, aggegationWindow);
+    }
+}
