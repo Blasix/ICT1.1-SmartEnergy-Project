@@ -1,14 +1,16 @@
-﻿@page "/measurements"
+﻿@page "/gasgebruik"
 @attribute [StreamRendering]
 @inject IMeasurementRepository measurementRepository;
+@inject NavigationManager NavigationManager;
 
-<PageTitle>Measurements</PageTitle>
+<PageTitle>Gas Gebruik</PageTitle>
 
-<h1>Measurements</h1>
-
-<p>Dit component toont hoe data getoond kan worden. De data die wordt getoond is van een voorgeprogrammeerde Smart Meter
-    in combinatie met data van het lectoraat Smart Energy (energieprijzen, temperaturen). Pas de code aan om de data van
-    jouw meter te tonen </p>
+<h1>Gas Gebruik</h1>
+<form>
+    <label for="days">Aantal dagen:</label>
+    <input type="number" id="days" name="days" min="1" max="30" @bind="@numberOfDays">
+    <button type="submit" class="btn-primary">Submit</button>
+</form>
 
 @if (measurements == null)
 {
@@ -16,35 +18,23 @@
 }
 else
 {
-    <!--
-        When the measurements variable has values in it we will draw a table with a header (thead) and
-        add the data to the table (tbody). We use the foreach to loop over te list of measurements and
-        a single line <tr> is added for each of the indivudial measurement objects. Colums are seperated
-        using <th> for the header or <td> for the body as you can see in the code below.
-    -->
     <table class="table">
     <thead>
         <tr>
-            <th>Timestamp (UTC)</th>
-            <th>Location ID</th>
-            <th>Sensor</th>
-            <th>Value</th>
+            <th>Datum</th>
+            <th>Graaddag</th>
+            <th>Gas Verbruik</th>
             <th>Unit</th>
-            <th>Price (energy only)</th>
-            <th>Temperature</th>
         </tr>
     </thead>
     <tbody>
         @foreach (var measurement in measurements)
             {
                 <tr>
-                    <td>@measurement.Timestamp</td>
-                    <td>@measurement.LocationId</td>
-                    <td>@measurement.Sensor</td>
+                    <td>@measurement.Timestamp.AddMicroseconds(-1).ToString("dd-MM-yyyy")</td>
+                    <td>@(Math.Round((decimal)(18 - (measurement.Temperature ?? 0)), 2))</td>
                     <td>@measurement.Value</td>
                     <td>@measurement.Unit</td>
-                    <td>@measurement.EnergyPrice</td>
-                    <td>@measurement.Temperature</td>
                 </tr>
             }
         </tbody>
@@ -57,28 +47,36 @@ else
     Feel free to adapt the code and tweak this to your needs. */
 
     private List<Measurement>? measurements;
+    private int numberOfDays = 7;
 
     protected override async Task OnInitializedAsync()
     {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        if (int.TryParse(queryParams["days"], out var days))
+        {
+            numberOfDays = days;
+        }
+
         /* TODO: update the value to the ID of your meter. Please note that this meterId is a decimal number and your
         P1 meter is a Hexadecimal number. Thus you need to convert the ID from HEX to Decimal and put the number here. */
         int meterId = 1078608;
 
-        /* TODO: Number of days to retrieve, ajust according to your needs/requirements. */
-        int numberOfDays = 3;
 
         /* TODO: The time window to summarize the data. Examples are 20s (20 seconds), 5m (5 minutes) or 1h (1 hour). The
         smaller the value you set the more records and details you will retrieve from the meter. But it will also take
         longer to render your razor page. So choose the value wisely! Note: Anything smaller than 20 seconds has no
         effect, since the P1 meter only collects the data every 20 seconds. */
-        string aggegationWindow = "5m";
+        string aggegationWindow = "1d";
 
         /* TODO: there are multiple data streams available. Two for the value of the power meter (consumed, produced)
         one for the gas consumption and another one for the absolute power usage. All of the possible method calls
         are listed below and you can select the one that meets your needs/requirements. */
-        measurements = await this.measurementRepository.GetEnergyConsumed(meterId, numberOfDays, aggegationWindow);
+        @* measurements = await this.measurementRepository.GetEnergyConsumed(meterId, numberOfDays, aggegationWindow); *@
         // measurements = await this.measurementRepository.GetEnergyProduced(meterId, numberOfDays, aggegationWindow);
-        // measurements = await this.measurementRepository.GetGasDelivered(meterId, numberOfDays, aggegationWindow);
-        // measurements = await this.measurementRepository.GetPower(meterId, numberOfDays, aggegationWindow);
+        measurements = await this.measurementRepository.GetGasDelivered(meterId, numberOfDays, aggegationWindow);
+        @* measurements = await this.measurementRepository.GetPower(meterId, numberOfDays, aggegationWindow); *@
+
     }
 }

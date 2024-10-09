@@ -27,7 +27,7 @@ h1:focus {
 .navbar-dark,
 .nav-scrollable,
 .top-row {
-    background-color: red;
+    background-color: #1861ac;
 }
 
 .valid.modified:not([type=checkbox]) {
