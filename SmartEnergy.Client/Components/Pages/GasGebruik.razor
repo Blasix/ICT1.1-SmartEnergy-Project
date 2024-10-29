@@ -93,22 +93,28 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Verkrijg de data in de url
         var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
         var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
 
+        // Krijg de hoeveelheid dagen uit de url
         if (int.TryParse(queryParams["days"], out var days))
         {
             numberOfDays = days;
         }
+        // Krijg het meterid uit de url
         if (queryParams["meterId"] != null)
         {
             meterIdHex = queryParams["meterId"];
         }
+        // Zet het meter id van hexadecimaal om naar decimaal
         int meterId = Convert.ToInt32(meterIdHex, 16);
 
+        // verkrijg de measurements
         measurements = await this.measurementRepository.GetGasDelivered(meterId, numberOfDays, "1d");
     }
 
+    // functie die de url update voor de dagen
     private void OnNumberOfDaysChanged(ChangeEventArgs e)
     {
         if (e.Value != null && int.TryParse(e.Value.ToString(), out var days))
@@ -118,6 +124,7 @@ else
         }
     }
 
+    // functie die de url update voor de meter id
     private void OnMeterIDChanged(ChangeEventArgs e)
     {
         if (e.Value != null)
@@ -127,6 +134,7 @@ else
         }
     }
 
+    // functie die zorgt dat de data op de goede plek staat in de url en het niks overwrite
     private void UpdateUrl()
     {
         var uri = new Uri(NavigationManager.Uri).GetLeftPart(UriPartial.Path) +
