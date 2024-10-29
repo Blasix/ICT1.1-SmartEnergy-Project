@@ -2,15 +2,56 @@
 @attribute [StreamRendering]
 @inject IMeasurementRepository measurementRepository;
 @inject NavigationManager NavigationManager;
+@rendermode InteractiveServer
+
+<style>
+    .component-grid {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .component {
+        padding: 10px;
+        border-style: solid;
+        border-color: #CCCCCC;
+        border-radius: 10px;
+    }
+
+    .slider {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+</style>
+
 
 <PageTitle>Gas Gebruik</PageTitle>
 
 <h1>Gas Gebruik</h1>
-<form>
-    <label for="days">Aantal dagen:</label>
-    <input type="number" id="days" name="days" min="1" max="30" @bind="@numberOfDays">
-    <button type="submit" class="btn-primary">Submit</button>
-</form>
+<p>
+    Op deze pagina kan je een goed overzicht krijgen van het gasbruik. Zowel de meter als de periode kunnen worden
+    aangepast. In de tabel kan je per dag de graaddag
+    (tempratuur verschil tussen binnen (18) en buiten) en het gasbebruik zien. Met deze pagina kan je dus
+    goed inzien hoeveel gas een huis gebruikt op basis van de tempratuur.
+</p>
+<div class="component-grid">
+    <div class="component" style="flex: 1 0 80%;">
+        <div class="slider" style="position: relative;">
+            <label for="numberOfDays" class="form-label">Hoeveel dagen terug kijken?</label>
+            <input type="range" class="form-range" min="1" max="30" id="numberOfDays" value="@numberOfDays"
+                @onchange="OnNumberOfDaysChanged">
+            <h2 style="position:absolute; right: 0;">@numberOfDays</h2>
+        </div>
+    </div>
+    <div class="component">
+        <label for="meterId" class="form-label">Meter ID (Hexadecimal)</label>
+        <input type="text" class="form-control" id="meterId" value="@meterIdHex" @onchange="OnMeterIDChanged">
+    </div>
+</div>
+
+
 
 @if (measurements == null)
 {
@@ -32,7 +73,7 @@ else
             {
                 <tr>
                     <td>@measurement.Timestamp.AddMicroseconds(-1).ToString("dd-MM-yyyy")</td>
-                    <td>@(Math.Round((decimal)(18 - (measurement.Temperature ?? 0)), 2))</td>
+                    <td>@(graadDag(measurement.Temperature) < 0 ? "N.V.T." : graadDag(measurement.Temperature))</td>
                     <td>@measurement.Value</td>
                     <td>@measurement.Unit</td>
                 </tr>
@@ -42,12 +83,13 @@ else
 }
 
 @code {
-    /* This is where all the magic happens. During the page load the OnInitializedAsync method is
-    executed and the measurementRepository is used to retrieve the data from the Influx Database.
-    Feel free to adapt the code and tweak this to your needs. */
-
     private List<Measurement>? measurements;
-    private int numberOfDays = 7;
+    private int numberOfDays { get; set; } = 7;
+    private decimal graadDag(double? temp)
+    {
+        return Math.Round((decimal)(18 - (temp ?? 0)), 2);
+    }
+    string meterIdHex { get; set; } = "107550";
 
     protected override async Task OnInitializedAsync()
     {
@@ -58,25 +100,37 @@ else
         {
             numberOfDays = days;
         }
+        if (queryParams["meterId"] != null)
+        {
+            meterIdHex = queryParams["meterId"];
+        }
+        int meterId = Convert.ToInt32(meterIdHex, 16);
 
-        /* TODO: update the value to the ID of your meter. Please note that this meterId is a decimal number and your
-        P1 meter is a Hexadecimal number. Thus you need to convert the ID from HEX to Decimal and put the number here. */
-        int meterId = 1078608;
+        measurements = await this.measurementRepository.GetGasDelivered(meterId, numberOfDays, "1d");
+    }
 
+    private void OnNumberOfDaysChanged(ChangeEventArgs e)
+    {
+        if (e.Value != null && int.TryParse(e.Value.ToString(), out var days))
+        {
+            numberOfDays = days;
+            UpdateUrl();
+        }
+    }
 
-        /* TODO: The time window to summarize the data. Examples are 20s (20 seconds), 5m (5 minutes) or 1h (1 hour). The
-        smaller the value you set the more records and details you will retrieve from the meter. But it will also take
-        longer to render your razor page. So choose the value wisely! Note: Anything smaller than 20 seconds has no
-        effect, since the P1 meter only collects the data every 20 seconds. */
-        string aggegationWindow = "1d";
+    private void OnMeterIDChanged(ChangeEventArgs e)
+    {
+        if (e.Value != null)
+        {
+            meterIdHex = e.Value.ToString();
+            UpdateUrl();
+        }
+    }
 
-        /* TODO: there are multiple data streams available. Two for the value of the power meter (consumed, produced)
-        one for the gas consumption and another one for the absolute power usage. All of the possible method calls
-        are listed below and you can select the one that meets your needs/requirements. */
-        @* measurements = await this.measurementRepository.GetEnergyConsumed(meterId, numberOfDays, aggegationWindow); *@
-        // measurements = await this.measurementRepository.GetEnergyProduced(meterId, numberOfDays, aggegationWindow);
-        measurements = await this.measurementRepository.GetGasDelivered(meterId, numberOfDays, aggegationWindow);
-        @* measurements = await this.measurementRepository.GetPower(meterId, numberOfDays, aggegationWindow); *@
-
+    private void UpdateUrl()
+    {
+        var uri = new Uri(NavigationManager.Uri).GetLeftPart(UriPartial.Path) +
+        $"?days={numberOfDays}&meterId={meterIdHex}";
+        NavigationManager.NavigateTo(uri, forceLoad: true);
     }
 }
